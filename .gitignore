@@ -1,7 +1,5 @@
 # Jupyter
 .ipynb_checkpoints/
-*.pdf
-*.html
 
 # Python
 __pycache__/
@@ -13,12 +11,10 @@ venv/
 env/
 .venv/
 
-# Data files
-*.csv
+# Heavy data files (keep small CSVs)
 *.xlsx
 *.xls
 *.sqlite
-data/
 
 # Security
 .env
