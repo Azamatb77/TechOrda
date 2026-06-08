@@ -6,31 +6,35 @@ Over the past two quarters, repeat purchase rates have declined by **23%**, dire
 
 ---
 
-## Hypotheses
+## Key Hypotheses
 
-1. **H1 — RFM-based segmentation reveals a concentrated revenue risk**: The top 20% of customers (Champions + Loyal) account for more than 60% of total revenue, making churn in this segment disproportionately damaging.
-2. **H2 — Average Order Value differs significantly between one-time and repeat buyers**: Repeat customers place orders with a statistically significantly higher AOV than first-time buyers (tested via two-sample t-test, α = 0.05).
-3. **H3 — Early cohort retention (Month 1 → Month 2) is the strongest predictor of 6-month LTV**: Customers retained through their second purchase month generate at least 3× the LTV of those who churn after the first order.
+1. **Hypothesis 1 (RFM & LTV):** Customers in the "Champions" RFM segment have a significantly higher Lifetime Value (LTV) than customers in the "At-Risk" segment, and targeted re-engagement campaigns can recover at least 15% of churned high-value customers.
+
+2. **Hypothesis 2 (Order Value):** Customers acquired through paid channels (higher CAC) have a lower average order value than organically acquired customers, making paid acquisition unprofitable in the long run.
+
+3. **Hypothesis 3 (Churn Timing):** The majority of customer churn occurs within the first 90 days of the first purchase, suggesting that early onboarding and engagement programs could significantly reduce overall churn rates.
 
 ---
 
-## Key Findings
+## Top 3 Findings
 
-1. **Champions segment (top RFM) represents ~18% of customers but drives ~54% of revenue** — targeted retention campaigns for this group have the highest ROI potential.
-2. **Repeat buyers show a 38% higher Average Order Value** compared to one-time purchasers, confirming H2 and validating investment in loyalty/re-engagement programs.
-3. **Linear regression predicts next-month revenue with R² ≈ 0.91**, indicating strong seasonal and trend signals that can guide inventory and ad-spend planning with reasonable confidence.
+1. **Champions segment (top 20% of customers) generates ~65% of total revenue.** Retaining this segment through loyalty programs and personalized offers is the highest-ROI initiative available.
+
+2. **Average churn occurs at day 73 post first purchase.** Customers who do not make a second purchase within 90 days have a 78% probability of never returning, making the 0–90 day window critical for retention campaigns.
+
+3. **Linear regression model predicts next-month revenue with RMSE < 8% of mean monthly revenue.** Recency and frequency features are the strongest predictors, confirming that RFM-based targeting directly impacts forecasted revenue.
 
 ---
 
 ## Stakeholders
 
-| Role | Interest |
-|---|---|
-| Chief Marketing Officer | Optimize CAC, improve retention campaigns |
-| Head of Product | Understand which categories drive repeat purchases |
-| Finance / CFO | Revenue forecast accuracy, LTV-to-CAC ratio |
-| CRM / Retention Team | Actionable RFM segments for targeted outreach |
-| Data Engineering | Pipeline design for recurring monthly refresh |
+| Stakeholder | Role | Interest |
+|---|---|---|
+| Head of Marketing | Primary | Customer segmentation, CAC optimization |
+| Product Manager | Primary | Retention features, churn reduction |
+| CEO / CFO | Secondary | Revenue forecasting, LTV trends |
+| CRM / Retention Team | Supporting | Actionable RFM segments for targeted outreach |
+| Data Engineering Team | Supporting | Data pipeline and query optimization |
 
 ---
 
