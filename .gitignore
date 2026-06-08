@@ -1,0 +1,30 @@
+# Jupyter
+.ipynb_checkpoints/
+*.pdf
+*.html
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Data files
+*.csv
+*.xlsx
+*.xls
+*.sqlite
+data/
+
+# Security
+.env
+config.yaml
+secrets.txt
+
+# System
+.DS_Store
+Thumbs.db
