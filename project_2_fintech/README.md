@@ -1,92 +1,100 @@
-# Fintech Analytics: Credit Card Spending Behavior & Prediction
-
-## Business Problem
-
-Financial institutions face a critical challenge in optimizing credit limits for cardholders. Setting limits too low results in customer dissatisfaction and lost revenue, while setting them too high increases default risk and capital exposure. This project analyzes credit card holder behavior, spending patterns, and creditworthiness to build a predictive model for next-month spending — enabling data-driven credit limit optimization decisions.
-
-**Goal:** Predict next month's customer spending using behavioral and demographic features to help Risk and Product teams make informed decisions about credit limit adjustments.
+# Финтех Аналитика: Поведение держателей кредитных карт и прогнозирование трат
 
 ---
 
-## Key Hypotheses
+## Бизнес-проблема
 
-1. **Income drives spending**: High-income customers (top quartile) spend significantly more per month than low-income customers (bottom quartile), making income the strongest predictor in a linear regression model.
-2. **Utilization predicts risk**: Customers with credit utilization above 80% are more likely to miss payments, making utilization rate a reliable early-warning signal for the risk team.
-3. **Spending patterns are seasonal**: Monthly transaction volumes show a consistent spike in Q4 (October–December) due to holiday spending, which should be factored into dynamic credit limit adjustments.
+Финансовые учреждения сталкиваются с критической проблемой **оптимизации кредитных лимитов** для держателей карт. Установка слишком низкого лимита ведёт к неудовлетворённости клиентов и упущенной выручке, тогда как слишком высокий лимит увеличивает риск дефолта и кредитные потери.
+
+**Цель:** предсказать траты клиента в следующем месяце на основе поведенческих и демографических признаков, чтобы помочь командам риск-менеджмента и продукта принимать обоснованные решения о корректировке кредитных лимитов.
 
 ---
 
-## Stakeholders
+## Ключевые гипотезы
 
-| Stakeholder | Role | Interest |
+1. **Доход определяет траты**: клиенты с высоким доходом (верхний квартиль) тратят значительно больше в месяц, чем клиенты с низким доходом (нижний квартиль) — доход является сильнейшим предиктором в линейной регрессии.
+2. **Утилизация предсказывает риск**: клиенты с коэффициентом использования кредитного лимита выше 80% с большей вероятностью допускают просрочки — утилизация является надёжным ранним сигналом для риск-команды.
+3. **Сезонность трат**: объём транзакций стабильно растёт в Q4 (октябрь–декабрь) за счёт праздничных расходов, что необходимо учитывать при динамической корректировке лимитов.
+
+---
+
+## Топ-3 находки
+
+1. **Доход — сильнейший предиктор ежемесячных трат** (корреляция ~0.70+). Клиенты с доходом выше 80 000 тг тратят в 2–3 раза больше, чем клиенты с доходом ниже 40 000 тг. Линейная регрессия достигает R² ≈ 0.68–0.72, подтверждая доход, кредитный лимит и количество транзакций как надёжные предикторы.
+2. **~18% клиентов находятся в высокорисковом сегменте** (утилизация > 80%). Эти клиенты регулярно исчерпывают свой лимит — чёткий сигнал для проактивного кредитного консультирования до возникновения дефолта.
+3. **Путешествия и продукты питания доминируют в структуре трат** (совокупно ~55% от общего объёма транзакций). Целевые кешбэк-предложения по этим категориям максимизируют вовлечённость клиентов при минимальных затратах.
+
+---
+
+## Стейкхолдеры
+
+| Стейкхолдер | Роль | Интерес |
 |---|---|---|
-| **Risk Manager** | Credit Risk Department | Identify high-risk customers, set appropriate credit limits, reduce default rates |
-| **Product Manager** | Credit Card Products | Understand spending behavior to design targeted offers, loyalty programs, and limit upgrade campaigns |
+| **Риск-менеджер** | Отдел кредитных рисков | Выявление высокорисковых клиентов, установка адекватных лимитов, снижение дефолтов |
+| **Продакт-менеджер** | Команда кредитных карт | Понимание паттернов трат для целевых предложений, программ лояльности и апгрейда лимитов |
 
 ---
 
-## Top 3 Findings
+## Технологии
 
-1. **Income is the strongest predictor of monthly spending** (correlation ~0.72). Customers earning above $80K spend 2.3x more on average than those earning below $40K. The linear regression model achieves R² ≈ 0.68–0.72, confirming income, credit limit, and transaction count as reliable predictors.
-2. **~18% of customers are in the high-risk segment** (utilization > 70%). These customers show a pattern of maxing out their cards repeatedly — a clear signal for proactive credit counseling or limit review before default occurs.
-3. **Grocery and travel categories dominate spending** (combined ~55% of total transaction volume). Targeted cashback offers in these categories would maximize customer engagement with minimal cost.
-
----
-
-## Technologies Used
-
-| Technology | Purpose |
+| Технология | Назначение |
 |---|---|
-| Python 3.11 | Core language |
-| pandas 2.1.4 | Data manipulation |
-| numpy 1.26.2 | Numerical computing |
-| matplotlib 3.8.2 | Static visualizations |
-| seaborn 0.13.0 | Statistical plots |
-| plotly 5.18.0 | Interactive charts |
-| scikit-learn 1.3.2 | Linear regression, metrics |
-| scipy 1.11.4 | Hypothesis testing (Mann-Whitney U) |
-| Jupyter 1.0.0 | Interactive analysis environment |
-| SQL (PostgreSQL syntax) | Data extraction queries with CTEs and window functions |
+| Python 3.11 | Основной язык |
+| pandas 2.1.4 | Обработка данных |
+| numpy 1.26.2 | Численные вычисления |
+| matplotlib 3.8.2 | Статические визуализации |
+| seaborn 0.13.0 | Статистические графики |
+| scikit-learn 1.3.2 | Линейная регрессия, метрики |
+| scipy 1.11.4 | Проверка гипотез (тест Манна-Уитни U) |
+| Jupyter 1.0.0 | Интерактивная среда анализа |
+| SQL (синтаксис PostgreSQL) | Запросы для извлечения данных с CTE и оконными функциями |
 
 ---
 
-## Project Structure
+## Структура проекта
 
 ```
 project_2_fintech/
-├── README.md            # Project overview, findings, and documentation
-├── analysis.ipynb       # Main Jupyter notebook with full analysis pipeline
-├── queries.sql          # SQL queries for data extraction and aggregation
-├── requirements.txt     # Python dependencies
-└── LICENSE              # MIT License
+├── README.md              # Обзор проекта, находки и документация
+├── analysis.ipynb         # Основной Jupyter-ноутбук с полным пайплайном анализа
+├── generate_data.py       # Скрипт генерации синтетических CSV-данных
+├── queries.sql            # SQL-запросы для извлечения и агрегации данных
+├── requirements.txt       # Python-зависимости
+├── data/
+│   ├── clients.csv        # 3 000 клиентов (демография, доход, лимиты)
+│   └── transactions.csv   # Транзакции за 12 месяцев
+└── LICENSE                # Лицензия MIT
 ```
 
-### Notebook Sections (`analysis.ipynb`)
+### Разделы ноутбука (`analysis.ipynb`)
 
-1. Business Problem Statement
-2. Synthetic Data Generation (simulating DB extraction, ~3000 customers)
-3. Data Preprocessing (IQR outlier removal, null handling, type casting)
-4. Exploratory Data Analysis (distributions, correlations, category breakdown, monthly trends)
-5. Key Business Metrics (utilization rate, risk segmentation)
-6. Linear Regression Model (predict next-month spending; R² and MAE reported)
-7. Hypothesis Testing (Mann-Whitney U: high-income vs low-income spending)
-8. Visualization Summary
-9. Business Recommendations for Risk Management
+1. Постановка задачи (банковская аналитика, оптимизация кредитных лимитов)
+2. Загрузка данных (pd.read_csv из data/)
+3. Предобработка (IQR для выбросов, fillna, astype, статистика до/после)
+4. Разведочный анализ — распределение трат по возрасту/доходу, категории, тренды
+5. Расчёт метрик (средний чек, коэффициент утилизации лимита, риск-сегменты)
+6. Линейная регрессия (прогноз трат, R² и MAE)
+7. Проверка гипотезы (U-тест Манна-Уитни: высокий доход vs низкий доход)
+8. Сводный дашборд (6 панелей)
+9. Выводы и рекомендации для риск-менеджера и продакт-менеджера
 
 ---
 
-## How to Run
+## Как запустить
 
 ```bash
-# Install dependencies
+# Установить зависимости
 pip install -r requirements.txt
 
-# Launch the notebook
+# Сгенерировать CSV-данные
+python generate_data.py
+
+# Запустить ноутбук
 jupyter notebook analysis.ipynb
 ```
 
 ---
 
-## License
+## Лицензия
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License — подробности в файле [LICENSE](LICENSE).

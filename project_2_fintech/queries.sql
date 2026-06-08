@@ -1,241 +1,260 @@
 -- ============================================================
--- Fintech Analytics: Credit Card Spending Behavior Queries
--- Database: PostgreSQL
--- Description: Analytical queries for credit card holder
---              behavior analysis and risk assessment
+-- Финтех Аналитика: SQL-запросы для анализа кредитных карт
+-- База данных: PostgreSQL
+-- Описание: Аналитические запросы для анализа поведения
+--           держателей кредитных карт и оценки рисков
 -- ============================================================
 
+
 -- ------------------------------------------------------------
--- 1. Average Transaction Amount by Customer Segment
---    Segments: Low / Mid / High income
+-- 1. Средняя сумма транзакции по сегментам клиентов
+--    Сегменты: Низкий / Средний / Высокий доход
 -- ------------------------------------------------------------
-WITH customer_segments AS (
+WITH сегменты_клиентов AS (
     SELECT
         c.customer_id,
-        c.income,
-        c.credit_limit,
+        c.income                                          AS доход,
+        c.credit_limit                                    AS кредитный_лимит,
+        -- Классификация по доходному сегменту
         CASE
-            WHEN c.income < 40000  THEN 'Low Income'
-            WHEN c.income < 80000  THEN 'Mid Income'
-            ELSE                        'High Income'
-        END AS income_segment,
+            WHEN c.income < 40000  THEN 'Низкий доход'
+            WHEN c.income < 80000  THEN 'Средний доход'
+            ELSE                        'Высокий доход'
+        END AS доходный_сегмент,
+        -- Классификация по возрастной группе
         CASE
             WHEN c.age < 30 THEN '18-29'
             WHEN c.age < 45 THEN '30-44'
             WHEN c.age < 60 THEN '45-59'
             ELSE                  '60+'
-        END AS age_group
+        END AS возрастная_группа
     FROM customers c
 ),
-transaction_stats AS (
+статистика_транзакций AS (
+    -- Агрегация транзакций по каждому клиенту
     SELECT
         t.customer_id,
-        AVG(t.amount)   AS avg_transaction_amount,
-        SUM(t.amount)   AS total_spending,
-        COUNT(*)        AS transaction_count
+        AVG(t.amount)   AS средняя_сумма_транзакции,
+        SUM(t.amount)   AS суммарные_траты,
+        COUNT(*)        AS количество_транзакций
     FROM transactions t
     GROUP BY t.customer_id
 )
 SELECT
-    cs.income_segment,
-    cs.age_group,
-    COUNT(cs.customer_id)                      AS customer_count,
-    ROUND(AVG(ts.avg_transaction_amount), 2)   AS avg_txn_amount,
-    ROUND(AVG(ts.total_spending), 2)           AS avg_total_spending,
-    ROUND(AVG(ts.transaction_count), 1)        AS avg_txn_count
-FROM customer_segments cs
-JOIN transaction_stats ts ON cs.customer_id = ts.customer_id
-GROUP BY cs.income_segment, cs.age_group
+    ск.доходный_сегмент,
+    ск.возрастная_группа,
+    COUNT(ск.customer_id)                          AS количество_клиентов,
+    ROUND(AVG(ст.средняя_сумма_транзакции), 2)    AS средняя_сумма_тр,
+    ROUND(AVG(ст.суммарные_траты), 2)             AS средние_суммарные_траты,
+    ROUND(AVG(ст.количество_транзакций), 1)        AS среднее_кол_транзакций
+FROM сегменты_клиентов ск
+JOIN статистика_транзакций ст ON ск.customer_id = ст.customer_id
+GROUP BY ск.доходный_сегмент, ск.возрастная_группа
 ORDER BY
-    CASE cs.income_segment
-        WHEN 'Low Income'  THEN 1
-        WHEN 'Mid Income'  THEN 2
-        WHEN 'High Income' THEN 3
+    -- Сортировка по доходному сегменту: Низкий → Средний → Высокий
+    CASE ск.доходный_сегмент
+        WHEN 'Низкий доход'   THEN 1
+        WHEN 'Средний доход'  THEN 2
+        WHEN 'Высокий доход'  THEN 3
     END,
-    cs.age_group;
+    ск.возрастная_группа;
 
 
 -- ------------------------------------------------------------
--- 2. Monthly Spending Trends (12-month rolling)
---    With month-over-month growth rate
+-- 2. Ежемесячная динамика трат за последние 12 месяцев
+--    С расчётом темпа роста месяц к месяцу (MoM)
 -- ------------------------------------------------------------
-WITH monthly_totals AS (
+WITH ежемесячные_итоги AS (
+    -- Агрегация транзакций по месяцам
     SELECT
-        DATE_TRUNC('month', t.transaction_date) AS txn_month,
-        COUNT(DISTINCT t.customer_id)           AS active_customers,
-        COUNT(*)                                AS total_transactions,
-        ROUND(SUM(t.amount), 2)                 AS total_spending,
-        ROUND(AVG(t.amount), 2)                 AS avg_transaction
+        DATE_TRUNC('month', t.transaction_date)     AS месяц,
+        COUNT(DISTINCT t.customer_id)               AS активных_клиентов,
+        COUNT(*)                                    AS всего_транзакций,
+        ROUND(SUM(t.amount), 2)                     AS суммарные_траты,
+        ROUND(AVG(t.amount), 2)                     AS средняя_транзакция
     FROM transactions t
     WHERE t.transaction_date >= CURRENT_DATE - INTERVAL '12 months'
     GROUP BY DATE_TRUNC('month', t.transaction_date)
 ),
-monthly_with_growth AS (
+динамика AS (
+    -- Добавляем темп роста через LAG
     SELECT
-        txn_month,
-        active_customers,
-        total_transactions,
-        total_spending,
-        avg_transaction,
-        LAG(total_spending) OVER (ORDER BY txn_month) AS prev_month_spending,
+        месяц,
+        активных_клиентов,
+        всего_транзакций,
+        суммарные_траты,
+        средняя_транзакция,
+        LAG(суммарные_траты) OVER (ORDER BY месяц) AS траты_прошлого_месяца,
+        -- Расчёт процентного изменения MoM
         ROUND(
-            100.0 * (total_spending - LAG(total_spending) OVER (ORDER BY txn_month))
-            / NULLIF(LAG(total_spending) OVER (ORDER BY txn_month), 0),
+            100.0 * (суммарные_траты - LAG(суммарные_траты) OVER (ORDER BY месяц))
+            / NULLIF(LAG(суммарные_траты) OVER (ORDER BY месяц), 0),
             2
-        ) AS mom_growth_pct
-    FROM monthly_totals
+        ) AS темп_роста_mom_pct
+    FROM ежемесячные_итоги
 )
 SELECT
-    TO_CHAR(txn_month, 'YYYY-MM')   AS month,
-    active_customers,
-    total_transactions,
-    total_spending,
-    avg_transaction,
-    COALESCE(mom_growth_pct, 0)     AS mom_growth_pct
-FROM monthly_with_growth
-ORDER BY txn_month;
+    TO_CHAR(месяц, 'YYYY-MM')          AS месяц_год,
+    активных_клиентов,
+    всего_транзакций,
+    суммарные_траты,
+    средняя_транзакция,
+    COALESCE(темп_роста_mom_pct, 0)    AS темп_роста_mom_pct
+FROM динамика
+ORDER BY месяц;
 
 
 -- ------------------------------------------------------------
--- 3. Credit Utilization Rate per Customer
---    Utilization = total_spending / credit_limit
+-- 3. Коэффициент использования кредитного лимита на клиента
+--    Утилизация = суммарные_траты / кредитный_лимит
 -- ------------------------------------------------------------
-WITH customer_spending AS (
+WITH траты_клиента AS (
+    -- Суммарные траты за 12 месяцев
     SELECT
         t.customer_id,
-        SUM(t.amount) AS total_spending_12m
+        SUM(t.amount) AS суммарные_траты_12м
     FROM transactions t
     WHERE t.transaction_date >= CURRENT_DATE - INTERVAL '12 months'
     GROUP BY t.customer_id
 ),
-utilization AS (
+утилизация AS (
+    -- Расчёт коэффициента и присвоение диапазона риска
     SELECT
         c.customer_id,
-        c.credit_limit,
-        cs.total_spending_12m,
-        ROUND(cs.total_spending_12m / NULLIF(c.credit_limit, 0), 4) AS utilization_rate,
+        c.credit_limit                                           AS кредитный_лимит,
+        тк.суммарные_траты_12м,
+        ROUND(тк.суммарные_траты_12м / NULLIF(c.credit_limit, 0), 4) AS коэф_утилизации,
         CASE
-            WHEN cs.total_spending_12m / NULLIF(c.credit_limit, 0) < 0.30 THEN 'Low (< 30%)'
-            WHEN cs.total_spending_12m / NULLIF(c.credit_limit, 0) < 0.60 THEN 'Moderate (30-60%)'
-            WHEN cs.total_spending_12m / NULLIF(c.credit_limit, 0) < 0.80 THEN 'High (60-80%)'
-            ELSE                                                               'Critical (> 80%)'
-        END AS utilization_band
+            WHEN тк.суммарные_траты_12м / NULLIF(c.credit_limit, 0) < 0.30 THEN 'Низкий (< 30%)'
+            WHEN тк.суммарные_траты_12м / NULLIF(c.credit_limit, 0) < 0.60 THEN 'Умеренный (30-60%)'
+            WHEN тк.суммарные_траты_12м / NULLIF(c.credit_limit, 0) < 0.80 THEN 'Высокий (60-80%)'
+            ELSE                                                               'Критический (> 80%)'
+        END AS диапазон_утилизации
     FROM customers c
-    JOIN customer_spending cs ON c.customer_id = cs.customer_id
+    JOIN траты_клиента тк ON c.customer_id = тк.customer_id
 )
 SELECT
     customer_id,
-    credit_limit,
-    total_spending_12m,
-    utilization_rate,
-    utilization_band
-FROM utilization
-ORDER BY utilization_rate DESC;
+    кредитный_лимит,
+    суммарные_траты_12м,
+    коэф_утилизации,
+    диапазон_утилизации
+FROM утилизация
+ORDER BY коэф_утилизации DESC;
 
 
 -- ------------------------------------------------------------
--- 4. Customers at Risk (near or over credit limit)
---    Flags customers for proactive outreach
+-- 4. Клиенты в зоне риска (близко к лимиту или за лимитом)
+--    Для проактивного контакта со стороны риск-команды
 -- ------------------------------------------------------------
-WITH monthly_spending AS (
+WITH ежемесячные_траты AS (
+    -- Траты каждого клиента в разрезе месяца
     SELECT
         t.customer_id,
-        DATE_TRUNC('month', t.transaction_date) AS txn_month,
-        SUM(t.amount)                           AS monthly_spend
+        DATE_TRUNC('month', t.transaction_date) AS месяц,
+        SUM(t.amount)                           AS траты_за_месяц
     FROM transactions t
     GROUP BY t.customer_id, DATE_TRUNC('month', t.transaction_date)
 ),
-customer_risk AS (
+риски_клиентов AS (
+    -- Вычисляем средние и пиковые показатели + количество «опасных» месяцев
     SELECT
-        ms.customer_id,
-        c.income,
-        c.credit_limit,
-        c.months_on_book,
-        ROUND(AVG(ms.monthly_spend), 2)                            AS avg_monthly_spend,
-        ROUND(MAX(ms.monthly_spend), 2)                            AS peak_monthly_spend,
-        ROUND(AVG(ms.monthly_spend) / NULLIF(c.credit_limit, 0), 4) AS avg_utilization,
-        ROUND(MAX(ms.monthly_spend) / NULLIF(c.credit_limit, 0), 4) AS peak_utilization,
-        COUNT(CASE WHEN ms.monthly_spend / c.credit_limit > 0.8 THEN 1 END) AS months_over_80pct
-    FROM monthly_spending ms
-    JOIN customers c ON ms.customer_id = c.customer_id
-    GROUP BY ms.customer_id, c.income, c.credit_limit, c.months_on_book
+        ет.customer_id,
+        c.income                                                            AS доход,
+        c.credit_limit                                                      AS кредитный_лимит,
+        c.months_on_book                                                    AS месяцев_в_банке,
+        ROUND(AVG(ет.траты_за_месяц), 2)                                   AS средние_траты_в_мес,
+        ROUND(MAX(ет.траты_за_месяц), 2)                                   AS пиковые_траты_в_мес,
+        ROUND(AVG(ет.траты_за_месяц) / NULLIF(c.credit_limit, 0), 4)      AS средняя_утилизация,
+        ROUND(MAX(ет.траты_за_месяц) / NULLIF(c.credit_limit, 0), 4)      AS пиковая_утилизация,
+        -- Сколько месяцев подряд утилизация превышала 80%
+        COUNT(CASE WHEN ет.траты_за_месяц / c.credit_limit > 0.8 THEN 1 END) AS месяцев_свыше_80pct
+    FROM ежемесячные_траты ет
+    JOIN customers c ON ет.customer_id = c.customer_id
+    GROUP BY ет.customer_id, c.income, c.credit_limit, c.months_on_book
 )
 SELECT
     customer_id,
-    income,
-    credit_limit,
-    months_on_book,
-    avg_monthly_spend,
-    peak_monthly_spend,
-    ROUND(avg_utilization * 100, 1)  AS avg_utilization_pct,
-    ROUND(peak_utilization * 100, 1) AS peak_utilization_pct,
-    months_over_80pct,
+    доход,
+    кредитный_лимит,
+    месяцев_в_банке,
+    средние_траты_в_мес,
+    пиковые_траты_в_мес,
+    ROUND(средняя_утилизация * 100, 1)  AS средняя_утилизация_pct,
+    ROUND(пиковая_утилизация * 100, 1)  AS пиковая_утилизация_pct,
+    месяцев_свыше_80pct,
+    -- Присвоение итогового флага риска
     CASE
-        WHEN avg_utilization > 0.80                        THEN 'HIGH RISK'
-        WHEN avg_utilization > 0.60 OR months_over_80pct >= 3 THEN 'MEDIUM RISK'
-        ELSE                                                    'LOW RISK'
-    END AS risk_flag
-FROM customer_risk
-WHERE avg_utilization > 0.60
-   OR months_over_80pct >= 2
-ORDER BY avg_utilization DESC, months_over_80pct DESC;
+        WHEN средняя_утилизация > 0.80                           THEN 'ВЫСОКИЙ РИСК'
+        WHEN средняя_утилизация > 0.60 OR месяцев_свыше_80pct >= 3 THEN 'СРЕДНИЙ РИСК'
+        ELSE                                                          'НИЗКИЙ РИСК'
+    END AS флаг_риска
+FROM риски_клиентов
+WHERE средняя_утилизация > 0.60
+   OR месяцев_свыше_80pct >= 2
+ORDER BY средняя_утилизация DESC, месяцев_свыше_80pct DESC;
 
 
 -- ------------------------------------------------------------
--- 5. Transaction Frequency Analysis
---    Per customer: frequency, recency, monetary value (RFM)
+-- 5. RFM-анализ клиентов
+--    R = Recency (давность), F = Frequency (частота), M = Monetary (сумма)
+--    Сегментация клиентов по ценности и активности
 -- ------------------------------------------------------------
-WITH rfm_base AS (
+WITH rfm_база AS (
+    -- Базовые показатели для каждого клиента за 12 месяцев
     SELECT
         t.customer_id,
-        MAX(t.transaction_date)                              AS last_txn_date,
-        CURRENT_DATE - MAX(t.transaction_date)::date        AS recency_days,
-        COUNT(*)                                             AS frequency,
-        ROUND(SUM(t.amount), 2)                              AS monetary,
-        ROUND(AVG(t.amount), 2)                              AS avg_amount,
-        COUNT(DISTINCT t.category)                           AS distinct_categories,
-        COUNT(DISTINCT DATE_TRUNC('month', t.transaction_date)) AS active_months
+        MAX(t.transaction_date)                                              AS дата_последней_тр,
+        CURRENT_DATE - MAX(t.transaction_date)::date                        AS дней_с_последней_тр,
+        COUNT(*)                                                             AS частота,
+        ROUND(SUM(t.amount), 2)                                              AS денежная_ценность,
+        ROUND(AVG(t.amount), 2)                                              AS средняя_сумма,
+        COUNT(DISTINCT t.category)                                           AS разных_категорий,
+        COUNT(DISTINCT DATE_TRUNC('month', t.transaction_date))              AS активных_месяцев
     FROM transactions t
     WHERE t.transaction_date >= CURRENT_DATE - INTERVAL '12 months'
     GROUP BY t.customer_id
 ),
-rfm_scored AS (
+rfm_оценки AS (
+    -- Присваиваем оценки от 1 до 5 по каждому измерению RFM
     SELECT
         *,
-        NTILE(5) OVER (ORDER BY recency_days ASC)  AS r_score,
-        NTILE(5) OVER (ORDER BY frequency DESC)    AS f_score,
-        NTILE(5) OVER (ORDER BY monetary DESC)     AS m_score
-    FROM rfm_base
+        NTILE(5) OVER (ORDER BY дней_с_последней_тр ASC)  AS оценка_r,  -- меньше дней = лучше
+        NTILE(5) OVER (ORDER BY частота DESC)              AS оценка_f,  -- больше транзакций = лучше
+        NTILE(5) OVER (ORDER BY денежная_ценность DESC)    AS оценка_m   -- больше суммы = лучше
+    FROM rfm_база
 ),
-rfm_final AS (
+rfm_итог AS (
+    -- Итоговый RFM-балл и код сегмента
     SELECT
         *,
-        (r_score + f_score + m_score)                AS rfm_total,
-        CONCAT(r_score::text, f_score::text, m_score::text) AS rfm_segment_code
-    FROM rfm_scored
+        (оценка_r + оценка_f + оценка_m)                           AS rfm_итого,
+        CONCAT(оценка_r::text, оценка_f::text, оценка_m::text)     AS rfm_код
+    FROM rfm_оценки
 )
 SELECT
-    rf.customer_id,
-    c.income,
-    c.credit_limit,
-    rf.recency_days,
-    rf.frequency,
-    rf.monetary,
-    rf.avg_amount,
-    rf.distinct_categories,
-    rf.active_months,
-    rf.r_score,
-    rf.f_score,
-    rf.m_score,
-    rf.rfm_total,
-    rf.rfm_segment_code,
+    ri.customer_id,
+    c.income                     AS доход,
+    c.credit_limit               AS кредитный_лимит,
+    ri.дней_с_последней_тр,
+    ri.частота,
+    ri.денежная_ценность,
+    ri.средняя_сумма,
+    ri.разных_категорий,
+    ri.активных_месяцев,
+    ri.оценка_r,
+    ri.оценка_f,
+    ri.оценка_m,
+    ri.rfm_итого,
+    ri.rfm_код,
+    -- Метка RFM-сегмента для маркетинга
     CASE
-        WHEN rf.rfm_total >= 13 THEN 'Champions'
-        WHEN rf.rfm_total >= 10 THEN 'Loyal Customers'
-        WHEN rf.rfm_total >= 7  THEN 'Potential Loyalists'
-        WHEN rf.rfm_total >= 5  THEN 'At Risk'
-        ELSE                        'Lost'
-    END AS rfm_label
-FROM rfm_final rf
-JOIN customers c ON rf.customer_id = c.customer_id
-ORDER BY rf.rfm_total DESC, rf.monetary DESC;
+        WHEN ri.rfm_итого >= 13 THEN 'Чемпионы'
+        WHEN ri.rfm_итого >= 10 THEN 'Лояльные клиенты'
+        WHEN ri.rfm_итого >= 7  THEN 'Потенциально лояльные'
+        WHEN ri.rfm_итого >= 5  THEN 'В зоне риска'
+        ELSE                        'Утраченные'
+    END AS rfm_сегмент
+FROM rfm_итог ri
+JOIN customers c ON ri.customer_id = c.customer_id
+ORDER BY ri.rfm_итого DESC, ri.денежная_ценность DESC;

@@ -1,63 +1,73 @@
-# Marketing Analytics: Ad Channel ROI & Conversion Funnel Analysis
+# Маркетинговая Аналитика: ROI рекламных каналов и анализ воронки конверсий
 
-## Business Problem
+## Бизнес-проблема
 
-Marketing budgets are frequently wasted on ineffective channels due to a lack of data-driven decision making. Without rigorous attribution and ROI measurement, companies over-invest in channels that generate impressions but not revenue, while under-investing in channels that drive actual conversions. This project analyzes advertising channel effectiveness, conversion funnel performance, and predicts ad budget ROI to enable smarter budget allocation.
+Компания тратит маркетинговый бюджет на 5 рекламных каналов (Google Ads, Facebook, Instagram, Email, TikTok), однако не имеет чёткого понимания, какие из них реально приносят прибыль. Без анализа данных менеджеры распределяют бюджет интуитивно, что приводит к перерасходу на неэффективные каналы и недофинансированию прибыльных. Данный проект анализирует эффективность каналов, производительность воронки конверсий и строит регрессионную модель прогноза выручки для обоснованного перераспределения бюджета.
 
-## Key Hypotheses
+## Ключевые гипотезы
 
-1. **H1:** Google Ads generates a statistically significantly higher ROI than Facebook Ads, justifying a larger budget share.
-2. **H2:** There is a strong positive linear relationship between ad spend and revenue — budget alone can predict revenue with R² > 0.7.
-3. **H3:** Email marketing has the lowest Cost per Acquisition (CAC) among all channels, making it the most cost-efficient channel for retention campaigns.
+1. **H1:** ROI Google Ads статистически значимо выше ROI Facebook — это обосновывает увеличение его доли в бюджете.
+2. **H2:** Существует сильная положительная линейная связь между рекламными расходами и выручкой (R² > 0.7).
+3. **H3:** Email-маркетинг имеет наименьший CAC среди всех каналов, что делает его наиболее экономически эффективным каналом для retention-кампаний.
 
-## Stakeholders
+## Топ-3 находки
 
-| Stakeholder | Role | Primary Interest |
+1. **Email и Google Ads обеспечивают наивысший ROI** — Email демонстрирует ~145% ROI при минимальном бюджете, а Google Ads генерирует максимальную абсолютную выручку при ~125% ROI. Оба канала недоиспользованы относительно их потенциала.
+
+2. **Узкое место воронки — переход «клик → конверсия»**: менее 10–15% кликов конвертируются в покупки по всем каналам. Это указывает на проблемы с лендингами и процессом оформления заказа.
+
+3. **Линейная регрессия объясняет ~87% дисперсии выручки (R² ≈ 0.87)** — при этом клики оказались более сильным предиктором, чем сам бюджет, что обосновывает приоритет оптимизации CPC над простым увеличением расходов.
+
+## Стейкхолдеры
+
+| Стейкхолдер | Роль | Ключевой интерес |
 |---|---|---|
-| CMO | Chief Marketing Officer | Overall budget efficiency, channel mix strategy |
-| Performance Marketer | Campaign Manager | Channel-level ROI, CAC, conversion rates |
+| CMO | Директор по маркетингу | Общая эффективность бюджета, стратегия каналов |
+| Performance-маркетолог | Менеджер кампаний | ROI по каналам, CAC, коэффициент конверсии |
 
-## Top 3 Findings
+## Технологии
 
-1. **Google Ads and Email deliver the highest ROI** — Google Ads averages ~120% ROI while Email marketing achieves ~140% ROI despite lower absolute spend, indicating email is underutilized.
-2. **The biggest conversion drop occurs between Click and Conversion** — only ~8–12% of clicks convert to paying customers across all channels, pointing to landing page and checkout funnel issues.
-3. **Linear regression explains ~82% of revenue variance (R² ≈ 0.82)** — budget and click volume together are strong predictors of revenue, validating the case for scaling proven channels.
-
-## Technologies Used
-
-| Tool | Purpose |
+| Инструмент | Назначение |
 |---|---|
-| Python 3.11 | Core analysis language |
-| pandas | Data manipulation and aggregation |
-| numpy | Numerical computations |
-| matplotlib / seaborn | Static visualizations |
-| plotly | Interactive charts |
-| scikit-learn | Linear regression model |
-| scipy | Statistical hypothesis testing (t-test) |
-| Jupyter Notebook | Interactive analysis environment |
-| SQL (PostgreSQL syntax) | Channel-level aggregations, funnel queries |
+| Python 3.11 | Основной язык анализа |
+| pandas | Обработка и агрегация данных |
+| numpy | Численные вычисления |
+| matplotlib / seaborn | Статические визуализации |
+| scikit-learn | Модель линейной регрессии |
+| scipy | Статистическая проверка гипотез (t-тест) |
+| Jupyter Notebook | Интерактивная среда анализа |
+| SQL (синтаксис PostgreSQL) | Агрегации по каналам, запросы воронки |
 
-## Project Structure
+## Структура проекта
 
 ```
 project_3_marketing/
-├── README.md               # Project overview and findings
-├── analysis.ipynb          # Main Jupyter notebook with full analysis
-├── queries.sql             # SQL queries for channel and funnel metrics
-├── requirements.txt        # Python dependencies
-└── LICENSE                 # MIT License
+├── README.md               # Обзор проекта и ключевые находки
+├── analysis.ipynb          # Основной Jupyter-ноутбук с полным анализом
+├── generate_data.py        # Скрипт генерации синтетических данных
+├── queries.sql             # SQL-запросы для метрик каналов и воронки
+├── requirements.txt        # Зависимости Python
+├── data/
+│   └── campaigns.csv       # Датасет: 200 рекламных кампаний
+└── LICENSE                 # Лицензия MIT
 ```
 
-## How to Run
+## Как запустить
 
 ```bash
-# Install dependencies
+# 1. Установить зависимости
 pip install -r requirements.txt
 
-# Launch notebook
+# 2. Сгенерировать данные
+cd project_3_marketing
+python generate_data.py
+
+# 3. Запустить ноутбук
 jupyter notebook analysis.ipynb
 ```
 
-## Dataset
+## Датасет
 
-Synthetic marketing data is generated inside the notebook (`analysis.ipynb`), simulating a real-world CRM/analytics export with ~200 campaigns across 5 channels (Google Ads, Facebook, Instagram, Email, TikTok) over 12 months.
+Синтетические данные генерируются скриптом `generate_data.py` и симулируют реальный экспорт из CRM/аналитики: ~200 кампаний по 5 каналам (Google Ads, Facebook, Instagram, Email, TikTok) за 12 месяцев 2024 года.
+
+Столбцы: `campaign_id`, `канал`, `бюджет`, `показы`, `клики`, `конверсии`, `выручка`, `дата_начала`

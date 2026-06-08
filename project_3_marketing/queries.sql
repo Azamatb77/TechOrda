@@ -1,205 +1,219 @@
 -- ============================================================
--- Marketing Analytics: SQL Queries
--- Dataset: campaigns(campaign_id, channel, budget, impressions,
---          clicks, conversions, revenue, start_date)
+-- Маркетинговая Аналитика: SQL-запросы
+-- Таблица: campaigns(campaign_id, канал, бюджет, показы,
+--          клики, конверсии, выручка, дата_начала)
 -- ============================================================
 
 
 -- ============================================================
--- 1. ROI by Marketing Channel
+-- 1. ROI по рекламным каналам
 -- ============================================================
-WITH channel_totals AS (
+WITH итоги_каналов AS (
     SELECT
-        channel,
-        COUNT(campaign_id)                              AS num_campaigns,
-        SUM(budget)                                     AS total_budget,
-        SUM(revenue)                                    AS total_revenue,
-        SUM(revenue - budget)                           AS total_profit
+        канал,
+        COUNT(campaign_id)                              AS количество_кампаний,
+        SUM(бюджет)                                     AS суммарный_бюджет,
+        SUM(выручка)                                    AS суммарная_выручка,
+        SUM(выручка - бюджет)                           AS суммарная_прибыль
     FROM campaigns
-    GROUP BY channel
+    GROUP BY канал
 )
 SELECT
-    channel,
-    num_campaigns,
-    ROUND(total_budget, 2)                              AS total_budget,
-    ROUND(total_revenue, 2)                             AS total_revenue,
-    ROUND(total_profit, 2)                              AS total_profit,
-    ROUND((total_profit / NULLIF(total_budget, 0)) * 100, 2)  AS roi_pct,
-    RANK() OVER (ORDER BY (total_profit / NULLIF(total_budget, 0)) DESC) AS roi_rank
-FROM channel_totals
+    канал,
+    количество_кампаний,
+    ROUND(суммарный_бюджет, 2)                          AS суммарный_бюджет,
+    ROUND(суммарная_выручка, 2)                         AS суммарная_выручка,
+    ROUND(суммарная_прибыль, 2)                         AS суммарная_прибыль,
+    -- ROI = (Выручка - Бюджет) / Бюджет * 100
+    ROUND((суммарная_прибыль / NULLIF(суммарный_бюджет, 0)) * 100, 2) AS roi_pct,
+    -- Ранг канала по убыванию ROI
+    RANK() OVER (ORDER BY (суммарная_прибыль / NULLIF(суммарный_бюджет, 0)) DESC) AS ранг_roi
+FROM итоги_каналов
 ORDER BY roi_pct DESC;
 
 
 -- ============================================================
--- 2. Conversion Rates at Each Funnel Stage
+-- 2. Коэффициенты конверсии на каждом этапе воронки
 -- ============================================================
-WITH funnel AS (
+WITH воронка AS (
     SELECT
-        channel,
-        SUM(impressions)                                AS total_impressions,
-        SUM(clicks)                                     AS total_clicks,
-        SUM(conversions)                                AS total_conversions,
-        SUM(revenue)                                    AS total_revenue
+        канал,
+        SUM(показы)                                     AS суммарные_показы,
+        SUM(клики)                                      AS суммарные_клики,
+        SUM(конверсии)                                  AS суммарные_конверсии,
+        SUM(выручка)                                    AS суммарная_выручка
     FROM campaigns
-    GROUP BY channel
+    GROUP BY канал
 )
 SELECT
-    channel,
-    total_impressions,
-    total_clicks,
-    total_conversions,
-    -- Stage 1: Impression -> Click (CTR)
-    ROUND(total_clicks::NUMERIC / NULLIF(total_impressions, 0) * 100, 2)      AS ctr_pct,
-    -- Stage 2: Click -> Conversion (CVR)
-    ROUND(total_conversions::NUMERIC / NULLIF(total_clicks, 0) * 100, 2)      AS cvr_pct,
-    -- Stage 3: Overall Funnel Rate
-    ROUND(total_conversions::NUMERIC / NULLIF(total_impressions, 0) * 100, 4) AS overall_conversion_rate_pct
-FROM funnel
+    канал,
+    суммарные_показы,
+    суммарные_клики,
+    суммарные_конверсии,
+    -- Этап 1: Показ → Клик (CTR — кликабельность)
+    ROUND(суммарные_клики::NUMERIC / NULLIF(суммарные_показы, 0) * 100, 2)        AS ctr_pct,
+    -- Этап 2: Клик → Конверсия (CVR — коэффициент конверсии)
+    ROUND(суммарные_конверсии::NUMERIC / NULLIF(суммарные_клики, 0) * 100, 2)     AS cvr_pct,
+    -- Этап 3: Общая воронка (Показ → Конверсия)
+    ROUND(суммарные_конверсии::NUMERIC / NULLIF(суммарные_показы, 0) * 100, 4)   AS общий_коэф_конверсии_pct
+FROM воронка
 ORDER BY cvr_pct DESC;
 
 
 -- ============================================================
--- 3. Cost Per Acquisition (CAC) by Channel
+-- 3. Стоимость привлечения клиента (CAC) по каналам
 -- ============================================================
-WITH cac_calc AS (
+WITH расчёт_cac AS (
     SELECT
-        channel,
-        SUM(budget)                                     AS total_spend,
-        SUM(conversions)                                AS total_conversions,
-        SUM(revenue)                                    AS total_revenue
+        канал,
+        SUM(бюджет)                                     AS суммарные_расходы,
+        SUM(конверсии)                                  AS суммарные_конверсии,
+        SUM(выручка)                                    AS суммарная_выручка
     FROM campaigns
-    GROUP BY channel
+    GROUP BY канал
 )
 SELECT
-    channel,
-    ROUND(total_spend, 2)                               AS total_spend,
-    total_conversions,
-    ROUND(total_spend / NULLIF(total_conversions, 0), 2) AS cac,
-    ROUND(total_revenue / NULLIF(total_conversions, 0), 2) AS avg_revenue_per_conversion,
+    канал,
+    ROUND(суммарные_расходы, 2)                         AS суммарные_расходы,
+    суммарные_конверсии,
+    -- CAC = Бюджет / Конверсии
+    ROUND(суммарные_расходы / NULLIF(суммарные_конверсии, 0), 2)  AS cac,
+    -- Средняя выручка на одну конверсию
+    ROUND(суммарная_выручка / NULLIF(суммарные_конверсии, 0), 2)  AS средняя_выручка_на_конверсию,
+    -- Отношение LTV к CAC (рентабельность привлечения)
     ROUND(
-        (total_revenue / NULLIF(total_conversions, 0)) /
-        NULLIF(total_spend / NULLIF(total_conversions, 0), 0), 2
-    )                                                   AS ltv_to_cac_ratio,
-    RANK() OVER (ORDER BY total_spend / NULLIF(total_conversions, 0) ASC) AS cac_rank
-FROM cac_calc
+        (суммарная_выручка / NULLIF(суммарные_конверсии, 0)) /
+        NULLIF(суммарные_расходы / NULLIF(суммарные_конверсии, 0), 0), 2
+    )                                                   AS ltv_к_cac,
+    -- Ранг по возрастанию CAC (меньше — лучше)
+    RANK() OVER (ORDER BY суммарные_расходы / NULLIF(суммарные_конверсии, 0) ASC) AS ранг_cac
+FROM расчёт_cac
 ORDER BY cac ASC;
 
 
 -- ============================================================
--- 4. Weekly Campaign Performance
+-- 4. Недельная динамика эффективности кампаний
 -- ============================================================
-WITH weekly AS (
+WITH недельная AS (
     SELECT
-        DATE_TRUNC('week', start_date)                  AS week_start,
-        channel,
-        COUNT(campaign_id)                              AS campaigns_launched,
-        SUM(budget)                                     AS weekly_spend,
-        SUM(impressions)                                AS weekly_impressions,
-        SUM(clicks)                                     AS weekly_clicks,
-        SUM(conversions)                                AS weekly_conversions,
-        SUM(revenue)                                    AS weekly_revenue
+        DATE_TRUNC('week', дата_начала)                 AS начало_недели,
+        канал,
+        COUNT(campaign_id)                              AS запущено_кампаний,
+        SUM(бюджет)                                     AS недельные_расходы,
+        SUM(показы)                                     AS недельные_показы,
+        SUM(клики)                                      AS недельные_клики,
+        SUM(конверсии)                                  AS недельные_конверсии,
+        SUM(выручка)                                    AS недельная_выручка
     FROM campaigns
-    GROUP BY DATE_TRUNC('week', start_date), channel
+    GROUP BY DATE_TRUNC('week', дата_начала), канал
 ),
-weekly_with_trends AS (
+недельная_с_трендами AS (
     SELECT
-        week_start,
-        channel,
-        campaigns_launched,
-        ROUND(weekly_spend, 2)                          AS weekly_spend,
-        weekly_impressions,
-        weekly_clicks,
-        weekly_conversions,
-        ROUND(weekly_revenue, 2)                        AS weekly_revenue,
-        ROUND((weekly_revenue - weekly_spend) / NULLIF(weekly_spend, 0) * 100, 2) AS weekly_roi_pct,
-        -- Week-over-week revenue change per channel
-        LAG(weekly_revenue) OVER (PARTITION BY channel ORDER BY week_start) AS prev_week_revenue,
+        начало_недели,
+        канал,
+        запущено_кампаний,
+        ROUND(недельные_расходы, 2)                     AS недельные_расходы,
+        недельные_показы,
+        недельные_клики,
+        недельные_конверсии,
+        ROUND(недельная_выручка, 2)                     AS недельная_выручка,
+        -- Недельный ROI
+        ROUND((недельная_выручка - недельные_расходы) / NULLIF(недельные_расходы, 0) * 100, 2) AS недельный_roi_pct,
+        -- Выручка предыдущей недели (для расчёта роста)
+        LAG(недельная_выручка) OVER (PARTITION BY канал ORDER BY начало_недели) AS выручка_пред_недели,
+        -- Изменение выручки неделя к неделе (WoW)
         ROUND(
-            (weekly_revenue - LAG(weekly_revenue) OVER (PARTITION BY channel ORDER BY week_start)) /
-            NULLIF(LAG(weekly_revenue) OVER (PARTITION BY channel ORDER BY week_start), 0) * 100, 2
-        )                                               AS wow_revenue_growth_pct
-    FROM weekly
+            (недельная_выручка - LAG(недельная_выручка) OVER (PARTITION BY канал ORDER BY начало_недели)) /
+            NULLIF(LAG(недельная_выручка) OVER (PARTITION BY канал ORDER BY начало_недели), 0) * 100, 2
+        )                                               AS рост_выручки_wow_pct
+    FROM недельная
 )
 SELECT *
-FROM weekly_with_trends
-ORDER BY week_start, channel;
+FROM недельная_с_трендами
+ORDER BY начало_недели, канал;
 
 
 -- ============================================================
--- 5. Attribution Analysis: Top Campaigns by Revenue Contribution
+-- 5. Атрибуция: топ кампании по вкладу в выручку
 -- ============================================================
-WITH campaign_metrics AS (
+WITH метрики_кампаний AS (
     SELECT
         campaign_id,
-        channel,
-        start_date,
-        budget,
-        impressions,
-        clicks,
-        conversions,
-        revenue,
-        revenue - budget                                AS profit,
-        ROUND(clicks::NUMERIC / NULLIF(impressions, 0) * 100, 2)       AS ctr_pct,
-        ROUND(conversions::NUMERIC / NULLIF(clicks, 0) * 100, 2)       AS cvr_pct,
-        ROUND((revenue - budget) / NULLIF(budget, 0) * 100, 2)         AS roi_pct
+        канал,
+        дата_начала,
+        бюджет,
+        показы,
+        клики,
+        конверсии,
+        выручка,
+        выручка - бюджет                                AS прибыль,
+        -- CTR кампании
+        ROUND(клики::NUMERIC / NULLIF(показы, 0) * 100, 2)         AS ctr_pct,
+        -- CVR кампании
+        ROUND(конверсии::NUMERIC / NULLIF(клики, 0) * 100, 2)      AS cvr_pct,
+        -- ROI кампании
+        ROUND((выручка - бюджет) / NULLIF(бюджет, 0) * 100, 2)     AS roi_pct
     FROM campaigns
 ),
-channel_revenue_totals AS (
-    SELECT channel, SUM(revenue) AS channel_total_revenue
+выручка_по_каналам AS (
+    -- Суммарная выручка по каждому каналу
+    SELECT канал, SUM(выручка) AS выручка_канала
     FROM campaigns
-    GROUP BY channel
+    GROUP BY канал
 ),
-grand_total AS (
-    SELECT SUM(revenue) AS total_revenue FROM campaigns
+общая_выручка AS (
+    -- Суммарная выручка по всем каналам
+    SELECT SUM(выручка) AS всего_выручки FROM campaigns
 )
 SELECT
-    cm.campaign_id,
-    cm.channel,
-    cm.start_date,
-    ROUND(cm.budget, 2)                                 AS budget,
-    ROUND(cm.revenue, 2)                                AS revenue,
-    cm.roi_pct,
-    cm.ctr_pct,
-    cm.cvr_pct,
-    -- Revenue share within channel
-    ROUND(cm.revenue / NULLIF(ct.channel_total_revenue, 0) * 100, 2)   AS pct_of_channel_revenue,
-    -- Revenue share overall
-    ROUND(cm.revenue / NULLIF(gt.total_revenue, 0) * 100, 2)           AS pct_of_total_revenue,
-    -- Percentile rank by ROI within channel
+    мк.campaign_id,
+    мк.канал,
+    мк.дата_начала,
+    ROUND(мк.бюджет, 2)                                 AS бюджет,
+    ROUND(мк.выручка, 2)                                AS выручка,
+    мк.roi_pct,
+    мк.ctr_pct,
+    мк.cvr_pct,
+    -- Доля выручки внутри канала
+    ROUND(мк.выручка / NULLIF(вк.выручка_канала, 0) * 100, 2)      AS доля_выручки_канала_pct,
+    -- Доля выручки от общей
+    ROUND(мк.выручка / NULLIF(ов.всего_выручки, 0) * 100, 2)       AS доля_общей_выручки_pct,
+    -- Перцентиль ROI внутри канала
     ROUND(
-        PERCENT_RANK() OVER (PARTITION BY cm.channel ORDER BY cm.roi_pct) * 100, 1
-    )                                                   AS roi_percentile_in_channel
-FROM campaign_metrics cm
-JOIN channel_revenue_totals ct ON cm.channel = ct.channel
-CROSS JOIN grand_total gt
-ORDER BY cm.revenue DESC
+        PERCENT_RANK() OVER (PARTITION BY мк.канал ORDER BY мк.roi_pct) * 100, 1
+    )                                                   AS перцентиль_roi_в_канале
+FROM метрики_кампаний мк
+JOIN выручка_по_каналам вк ON мк.канал = вк.канал
+CROSS JOIN общая_выручка ов
+ORDER BY мк.выручка DESC
 LIMIT 50;
 
 
 -- ============================================================
--- 6. Monthly Channel Budget vs Revenue Trend
+-- 6. Ежемесячный тренд бюджета и выручки по каналам
 -- ============================================================
-WITH monthly AS (
+WITH месячная AS (
     SELECT
-        TO_CHAR(start_date, 'YYYY-MM')                 AS month,
-        channel,
-        ROUND(SUM(budget), 2)                          AS monthly_budget,
-        ROUND(SUM(revenue), 2)                         AS monthly_revenue,
-        SUM(conversions)                               AS monthly_conversions
+        TO_CHAR(дата_начала, 'YYYY-MM')                AS месяц,
+        канал,
+        ROUND(SUM(бюджет), 2)                          AS месячный_бюджет,
+        ROUND(SUM(выручка), 2)                         AS месячная_выручка,
+        SUM(конверсии)                                 AS месячные_конверсии
     FROM campaigns
-    GROUP BY TO_CHAR(start_date, 'YYYY-MM'), channel
+    GROUP BY TO_CHAR(дата_начала, 'YYYY-MM'), канал
 )
 SELECT
-    month,
-    channel,
-    monthly_budget,
-    monthly_revenue,
-    monthly_conversions,
-    ROUND((monthly_revenue - monthly_budget) / NULLIF(monthly_budget, 0) * 100, 2) AS monthly_roi_pct,
-    -- Running total revenue per channel
-    ROUND(SUM(monthly_revenue) OVER (PARTITION BY channel ORDER BY month
-          ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2)         AS cumulative_revenue,
-    -- Monthly budget as % of that channel's total annual budget
-    ROUND(monthly_budget / SUM(monthly_budget) OVER (PARTITION BY channel) * 100, 2) AS pct_of_annual_budget
-FROM monthly
-ORDER BY month, channel;
+    месяц,
+    канал,
+    месячный_бюджет,
+    месячная_выручка,
+    месячные_конверсии,
+    -- Месячный ROI
+    ROUND((месячная_выручка - месячный_бюджет) / NULLIF(месячный_бюджет, 0) * 100, 2) AS месячный_roi_pct,
+    -- Накопленная выручка по каналу (нарастающим итогом)
+    ROUND(SUM(месячная_выручка) OVER (PARTITION BY канал ORDER BY месяц
+          ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2)          AS накопленная_выручка,
+    -- Доля месячного бюджета от годового бюджета канала
+    ROUND(месячный_бюджет / SUM(месячный_бюджет) OVER (PARTITION BY канал) * 100, 2)  AS доля_годового_бюджета_pct
+FROM месячная
+ORDER BY месяц, канал;
