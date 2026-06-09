@@ -1,76 +1,83 @@
-# E-commerce Sales Analytics: RFM Segmentation & LTV Optimization
+# E-commerce Аналитика: RFM-сегментация и оптимизация LTV
 
-## Business Problem
+## Бизнес-проблема
 
-Over the past two quarters, repeat purchase rates have declined by **23%**, directly impacting Customer Lifetime Value (LTV) and overall revenue sustainability. The business needs to understand *which* customer segments are churning, *why* high-value customers are not returning, and *what* revenue can be expected in the coming months to inform marketing budget allocation.
+За последние два квартала показатель повторных покупок снизился на **23%**, напрямую влияя на Пожизненную ценность клиента (LTV) и устойчивость выручки. Бизнесу необходимо понять:
 
----
-
-## Key Hypotheses
-
-1. **Hypothesis 1 (RFM & LTV):** Customers in the "Champions" RFM segment have a significantly higher Lifetime Value (LTV) than customers in the "At-Risk" segment, and targeted re-engagement campaigns can recover at least 15% of churned high-value customers.
-
-2. **Hypothesis 2 (Order Value):** Customers acquired through paid channels (higher CAC) have a lower average order value than organically acquired customers, making paid acquisition unprofitable in the long run.
-
-3. **Hypothesis 3 (Churn Timing):** The majority of customer churn occurs within the first 90 days of the first purchase, suggesting that early onboarding and engagement programs could significantly reduce overall churn rates.
+- **Какие** клиентские сегменты теряются?
+- **Почему** высокоценные клиенты не возвращаются?
+- **Какую** выручку ожидать в ближайшие месяцы?
 
 ---
 
-## Top 3 Findings
+## Ключевые гипотезы
 
-1. **Champions segment (top 20% of customers) generates ~65% of total revenue.** Retaining this segment through loyalty programs and personalized offers is the highest-ROI initiative available.
+1. **Гипотеза 1 (RFM и LTV):** Клиенты из сегмента «Чемпионы» имеют значительно более высокий LTV, чем клиенты из сегмента «Группа риска»; целевые кампании могут вернуть минимум 15% ушедших высокоценных клиентов.
 
-2. **Average churn occurs at day 73 post first purchase.** Customers who do not make a second purchase within 90 days have a 78% probability of never returning, making the 0–90 day window critical for retention campaigns.
+2. **Гипотеза 2 (Средний чек):** Клиенты, привлечённые через платные каналы (высокий CAC), имеют меньший средний чек, чем клиенты из органического канала, что делает платное привлечение невыгодным в долгосрочной перспективе.
 
-3. **Linear regression model predicts next-month revenue with RMSE < 8% of mean monthly revenue.** Recency and frequency features are the strongest predictors, confirming that RFM-based targeting directly impacts forecasted revenue.
+3. **Гипотеза 3 (Отток):** Большинство оттока происходит в первые 90 дней после первой покупки, что указывает на необходимость ранних программ онбординга.
 
 ---
 
-## Stakeholders
+## Топ-3 находки
 
-| Stakeholder | Role | Interest |
+1. **Топ-сегмент «Чемпионы» генерирует около 65% суммарной выручки.** Удержание этого сегмента через программы лояльности и персонализированные предложения — наиболее высокодоходная инициатива.
+
+2. **Средний отток происходит на 73-й день после первой покупки.** Клиенты, не совершившие вторую покупку в течение 90 дней, с вероятностью 78% никогда не вернутся — окно 0–90 дней критически важно для удержания.
+
+3. **Модель линейной регрессии прогнозирует выручку следующего месяца с RMSE < 8% от среднего значения.** Признаки давности и частоты покупок являются наиболее значимыми предикторами.
+
+---
+
+## Стейкхолдеры
+
+| Стейкхолдер | Роль | Интерес |
 |---|---|---|
-| Head of Marketing | Primary | Customer segmentation, CAC optimization |
-| Product Manager | Primary | Retention features, churn reduction |
-| CEO / CFO | Secondary | Revenue forecasting, LTV trends |
-| CRM / Retention Team | Supporting | Actionable RFM segments for targeted outreach |
-| Data Engineering Team | Supporting | Data pipeline and query optimization |
+| Руководитель маркетинга | Основной | Сегментация клиентов, оптимизация CAC |
+| Продуктовый менеджер | Основной | Функции удержания, снижение оттока |
+| Генеральный / финансовый директор | Вторичный | Прогноз выручки, тренды LTV |
+| CRM / команда удержания | Поддерживающий | Сегменты RFM для таргетированного охвата |
+| Команда разработки данных | Поддерживающий | Оптимизация пайплайна данных и запросов |
 
 ---
 
-## Technologies Used
+## Технологии
 
-| Tool | Purpose |
+| Инструмент | Назначение |
 |---|---|
-| Python 3.11 | Core analysis language |
-| pandas 2.1.4 | Data manipulation and aggregation |
-| numpy 1.26.2 | Numerical operations |
-| matplotlib 3.8.2 | Base charting |
-| seaborn 0.13.0 | Statistical visualizations |
-| plotly 5.18.0 | Interactive charts |
-| scikit-learn 1.3.2 | Linear regression, preprocessing |
-| scipy 1.11.4 | Statistical hypothesis testing |
-| Jupyter 1.0.0 | Interactive notebook environment |
-| SQL (PostgreSQL syntax) | Upstream data extraction queries |
+| Python 3.11 | Основной язык анализа |
+| pandas 2.1.4 | Обработка и агрегация данных |
+| numpy 1.26.2 | Числовые вычисления |
+| matplotlib 3.8.2 | Базовые графики |
+| seaborn 0.13.0 | Статистические визуализации |
+| scikit-learn 1.3.2 | Линейная регрессия, нормализация |
+| scipy 1.11.4 | Статистическое тестирование гипотез |
+| Jupyter 1.0.0 | Интерактивная среда ноутбука |
+| SQL (PostgreSQL) | Запросы для промышленной выгрузки данных |
 
 ---
 
-## Project Structure
+## Структура проекта
 
 ```
 project_1_ecommerce/
-├── analysis.ipynb       # Main analysis notebook (self-contained, generates synthetic data)
-├── queries.sql          # SQL queries for production data extraction
-├── requirements.txt     # Pinned Python dependencies
-├── README.md            # This file
-└── LICENSE              # MIT License
+├── generate_data.py     # Скрипт генерации CSV данных
+├── analysis.ipynb       # Основной аналитический ноутбук (на русском языке)
+├── queries.sql          # SQL запросы для промышленной выгрузки
+├── requirements.txt     # Зависимости Python
+├── README.md            # Данный файл
+├── LICENSE              # Лицензия MIT
+└── data/
+    ├── customers.csv    # 500 клиентов (генерируется скриптом)
+    └── orders.csv       # 5 000 заказов (генерируется скриптом)
 ```
 
 ---
 
-## How to Run
+## Как запустить
 
-### 1. Set up the environment
+### 1. Установить зависимости
 
 ```bash
 cd /home/user/TechOrda/project_1_ecommerce
@@ -79,34 +86,38 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Launch Jupyter
+### 2. Сгенерировать данные
+
+```bash
+python generate_data.py
+```
+
+Скрипт создаст файлы `data/customers.csv` и `data/orders.csv`.
+
+### 3. Запустить Jupyter
 
 ```bash
 jupyter notebook analysis.ipynb
 ```
 
-### 3. Run all cells
+### 4. Выполнить все ячейки
 
-Use **Kernel → Restart & Run All** to execute the full notebook end-to-end.
-
-The notebook is **fully self-contained** — it generates ~5,000 synthetic orders across 500 customers and 12 months internally. No external data files are required.
+Используйте **Ядро → Перезапустить и выполнить всё** для запуска полного анализа.
 
 ---
 
-## SQL Queries
+## SQL запросы
 
-`queries.sql` contains production-ready CTE-based queries (PostgreSQL syntax) that mirror the analysis performed in the notebook:
+`queries.sql` содержит готовые к использованию CTE-запросы (синтаксис PostgreSQL), которые повторяют анализ из ноутбука:
 
-- Monthly revenue trends with MoM growth
-- Top customers ranked by Lifetime Value
-- RFM score calculation using window functions
-- Cohort retention matrix
-- Product category performance with contribution %
-
-These queries are intended to run against a transactional database and feed the same pipeline the notebook demonstrates on synthetic data.
+- Тренды ежемесячной выручки с приростом месяц к месяцу
+- Топ клиентов по пожизненной ценности (LTV)
+- Расчёт RFM оценок с использованием оконных функций
+- Матрица когортного удержания
+- Эффективность категорий товаров с долей вклада в выручку
 
 ---
 
-## License
+## Лицензия
 
-MIT License — see [LICENSE](LICENSE) for details.
+Лицензия MIT — подробности в файле [LICENSE](LICENSE).

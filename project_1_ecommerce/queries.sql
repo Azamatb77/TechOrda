@@ -1,272 +1,246 @@
 -- ============================================================
--- E-commerce Sales Analytics: Production SQL Queries
--- Database: PostgreSQL
--- Author: Analytics Team
--- Description: CTE-based queries mirroring the notebook analysis
+-- E-commerce Аналитика: SQL-запросы для промышленной выгрузки
+-- База данных: PostgreSQL
+-- Описание: CTE-запросы, повторяющие анализ из ноутбука
 -- ============================================================
 
 
 -- ------------------------------------------------------------
--- 1. MONTHLY REVENUE TRENDS WITH MoM GROWTH
+-- 1. ЕЖЕМЕСЯЧНАЯ ДИНАМИКА ВЫРУЧКИ С ПРИРОСТОМ MoM
 -- ------------------------------------------------------------
-WITH monthly_revenue AS (
+WITH ежемесячная_выручка AS (
     SELECT
-        DATE_TRUNC('month', order_date)::DATE          AS month,
-        COUNT(DISTINCT order_id)                        AS total_orders,
-        COUNT(DISTINCT customer_id)                     AS unique_customers,
-        ROUND(SUM(order_value)::NUMERIC, 2)             AS revenue,
-        ROUND(AVG(order_value)::NUMERIC, 2)             AS avg_order_value
+        DATE_TRUNC('month', дата_заказа)::DATE          AS месяц,
+        COUNT(DISTINCT order_id)                         AS кол_заказов,
+        COUNT(DISTINCT customer_id)                      AS уникальных_клиентов,
+        ROUND(SUM(сумма_заказа)::NUMERIC, 2)             AS выручка,
+        ROUND(AVG(сумма_заказа)::NUMERIC, 2)             AS средний_чек
     FROM orders
-    WHERE order_status != 'cancelled'
+    WHERE статус != 'отменён'
     GROUP BY 1
 ),
-revenue_with_lag AS (
+выручка_с_лагом AS (
     SELECT
-        month,
-        total_orders,
-        unique_customers,
-        revenue,
-        avg_order_value,
-        LAG(revenue) OVER (ORDER BY month)              AS prev_month_revenue
-    FROM monthly_revenue
+        месяц,
+        кол_заказов,
+        уникальных_клиентов,
+        выручка,
+        средний_чек,
+        LAG(выручка) OVER (ORDER BY месяц)               AS выручка_пред_месяца
+    FROM ежемесячная_выручка
 )
 SELECT
-    month,
-    total_orders,
-    unique_customers,
-    revenue,
-    avg_order_value,
-    prev_month_revenue,
+    месяц,
+    кол_заказов,
+    уникальных_клиентов,
+    выручка,
+    средний_чек,
+    -- Прирост выручки месяц к месяцу
     ROUND(
-        100.0 * (revenue - prev_month_revenue) / NULLIF(prev_month_revenue, 0),
+        100.0 * (выручка - выручка_пред_месяца) / NULLIF(выручка_пред_месяца, 0),
         2
-    )                                                   AS mom_growth_pct
-FROM revenue_with_lag
-ORDER BY month;
+    )                                                    AS прирост_mom_pct
+FROM выручка_с_лагом
+ORDER BY месяц;
 
 
 -- ------------------------------------------------------------
--- 2. TOP CUSTOMERS BY LIFETIME VALUE (LTV)
+-- 2. ТОП КЛИЕНТОВ ПО ПОЖИЗНЕННОЙ ЦЕННОСТИ (LTV)
 -- ------------------------------------------------------------
-WITH customer_orders AS (
+WITH заказы_клиентов AS (
     SELECT
         o.customer_id,
-        c.customer_name,
-        c.acquisition_channel,
-        c.registration_date,
-        COUNT(DISTINCT o.order_id)                      AS total_orders,
-        ROUND(SUM(o.order_value)::NUMERIC, 2)           AS total_revenue,
-        MIN(o.order_date)                               AS first_order_date,
-        MAX(o.order_date)                               AS last_order_date,
-        ROUND(AVG(o.order_value)::NUMERIC, 2)           AS avg_order_value,
-        MAX(o.order_date) - MIN(o.order_date)           AS customer_lifespan_days
+        c.канал_привлечения,
+        c.дата_регистрации,
+        COUNT(DISTINCT o.order_id)                       AS всего_заказов,
+        ROUND(SUM(o.сумма_заказа)::NUMERIC, 2)           AS суммарная_выручка,
+        MIN(o.дата_заказа)                               AS первый_заказ,
+        MAX(o.дата_заказа)                               AS последний_заказ,
+        ROUND(AVG(o.сумма_заказа)::NUMERIC, 2)           AS средний_чек,
+        MAX(o.дата_заказа) - MIN(o.дата_заказа)          AS дней_активности
     FROM orders o
     JOIN customers c ON o.customer_id = c.customer_id
-    WHERE o.order_status != 'cancelled'
-    GROUP BY o.customer_id, c.customer_name, c.acquisition_channel, c.registration_date
+    WHERE o.статус = 'выполнен'
+    GROUP BY o.customer_id, c.канал_привлечения, c.дата_регистрации
 ),
-ltv_ranked AS (
+ltv_ранжирование AS (
     SELECT
         *,
-        ROUND(
-            total_revenue * (365.0 / NULLIF(customer_lifespan_days, 0)),
-            2
-        )                                               AS annualized_ltv,
-        NTILE(10) OVER (ORDER BY total_revenue DESC)    AS ltv_decile,
-        RANK() OVER (ORDER BY total_revenue DESC)       AS ltv_rank
-    FROM customer_orders
+        -- Аннуализированный LTV
+        ROUND(суммарная_выручка * (365.0 / NULLIF(дней_активности, 0)), 2) AS ltv_годовой,
+        NTILE(10) OVER (ORDER BY суммарная_выручка DESC)                    AS ltv_дециль,
+        RANK() OVER (ORDER BY суммарная_выручка DESC)                       AS ltv_ранг
+    FROM заказы_клиентов
 )
 SELECT
-    ltv_rank,
+    ltv_ранг,
     customer_id,
-    customer_name,
-    acquisition_channel,
-    total_orders,
-    total_revenue,
-    avg_order_value,
-    annualized_ltv,
-    customer_lifespan_days,
-    ltv_decile
-FROM ltv_ranked
-ORDER BY ltv_rank
+    канал_привлечения,
+    всего_заказов,
+    суммарная_выручка,
+    средний_чек,
+    ltv_годовой,
+    дней_активности,
+    ltv_дециль
+FROM ltv_ранжирование
+ORDER BY ltv_ранг
 LIMIT 100;
 
 
 -- ------------------------------------------------------------
--- 3. RFM SCORES CALCULATION
+-- 3. РАСЧЁТ RFM-ОЦЕНОК
 -- ------------------------------------------------------------
-WITH snapshot_date AS (
-    SELECT MAX(order_date) + INTERVAL '1 day' AS ref_date
-    FROM orders
-    WHERE order_status != 'cancelled'
+WITH дата_среза AS (
+    SELECT MAX(дата_заказа) + INTERVAL '1 day' AS реф_дата
+    FROM orders WHERE статус = 'выполнен'
 ),
-rfm_base AS (
+rfm_база AS (
     SELECT
         o.customer_id,
-        EXTRACT(DAY FROM (s.ref_date - MAX(o.order_date)))::INT  AS recency_days,
-        COUNT(DISTINCT o.order_id)                                AS frequency,
-        ROUND(SUM(o.order_value)::NUMERIC, 2)                    AS monetary
+        EXTRACT(DAY FROM (s.реф_дата - MAX(o.дата_заказа)))::INT AS давность_дней,
+        COUNT(DISTINCT o.order_id)                                AS частота,
+        ROUND(SUM(o.сумма_заказа)::NUMERIC, 2)                   AS монетизация
     FROM orders o
-    CROSS JOIN snapshot_date s
-    WHERE o.order_status != 'cancelled'
-    GROUP BY o.customer_id, s.ref_date
+    CROSS JOIN дата_среза s
+    WHERE o.статус = 'выполнен'
+    GROUP BY o.customer_id, s.реф_дата
 ),
-rfm_percentiles AS (
+rfm_оценки AS (
     SELECT
         customer_id,
-        recency_days,
-        frequency,
-        monetary,
-        -- R score: lower recency = better (score 5)
+        давность_дней,
+        частота,
+        монетизация,
+        -- R-балл: меньше давность = лучше (оценка 5)
         CASE
-            WHEN recency_days <= PERCENTILE_CONT(0.20) WITHIN GROUP (ORDER BY recency_days) OVER () THEN 5
-            WHEN recency_days <= PERCENTILE_CONT(0.40) WITHIN GROUP (ORDER BY recency_days) OVER () THEN 4
-            WHEN recency_days <= PERCENTILE_CONT(0.60) WITHIN GROUP (ORDER BY recency_days) OVER () THEN 3
-            WHEN recency_days <= PERCENTILE_CONT(0.80) WITHIN GROUP (ORDER BY recency_days) OVER () THEN 2
+            WHEN давность_дней <= PERCENTILE_CONT(0.20) WITHIN GROUP (ORDER BY давность_дней) OVER () THEN 5
+            WHEN давность_дней <= PERCENTILE_CONT(0.40) WITHIN GROUP (ORDER BY давность_дней) OVER () THEN 4
+            WHEN давность_дней <= PERCENTILE_CONT(0.60) WITHIN GROUP (ORDER BY давность_дней) OVER () THEN 3
+            WHEN давность_дней <= PERCENTILE_CONT(0.80) WITHIN GROUP (ORDER BY давность_дней) OVER () THEN 2
             ELSE 1
-        END                                                       AS r_score,
-        -- F score: higher frequency = better
-        NTILE(5) OVER (ORDER BY frequency ASC)                   AS f_score,
-        -- M score: higher monetary = better
-        NTILE(5) OVER (ORDER BY monetary ASC)                    AS m_score
-    FROM rfm_base
+        END                                                       AS r_балл,
+        -- F-балл: больше частота = лучше
+        NTILE(5) OVER (ORDER BY частота ASC)                      AS f_балл,
+        -- M-балл: больше монетизация = лучше
+        NTILE(5) OVER (ORDER BY монетизация ASC)                  AS m_балл
+    FROM rfm_база
 ),
-rfm_segments AS (
+rfm_сегменты AS (
     SELECT
         customer_id,
-        recency_days,
-        frequency,
-        monetary,
-        r_score,
-        f_score,
-        m_score,
-        (r_score + f_score + m_score)                             AS rfm_total,
-        CONCAT(r_score::TEXT, f_score::TEXT, m_score::TEXT)       AS rfm_cell,
+        давность_дней,
+        частота,
+        монетизация,
+        r_балл, f_балл, m_балл,
+        (r_балл + f_балл + m_балл)                                AS rfm_сумма,
         CASE
-            WHEN r_score >= 4 AND f_score >= 4 AND m_score >= 4   THEN 'Champions'
-            WHEN r_score >= 3 AND f_score >= 3                     THEN 'Loyal Customers'
-            WHEN r_score >= 4 AND f_score <= 2                     THEN 'Recent Customers'
-            WHEN r_score >= 3 AND f_score <= 3 AND m_score >= 3    THEN 'Potential Loyalists'
-            WHEN r_score <= 2 AND f_score >= 4                     THEN 'At Risk'
-            WHEN r_score <= 2 AND f_score >= 2 AND m_score >= 2    THEN 'Cant Lose Them'
-            WHEN r_score <= 2 AND f_score <= 2                     THEN 'Lost'
-            ELSE 'Hibernating'
-        END                                                        AS segment
-    FROM rfm_percentiles
+            WHEN r_балл >= 4 AND f_балл >= 4 AND m_балл >= 4     THEN 'Чемпионы'
+            WHEN r_балл >= 3 AND f_балл >= 3                      THEN 'Лояльные клиенты'
+            WHEN r_балл >= 4 AND f_балл <= 2                      THEN 'Новые клиенты'
+            WHEN r_балл >= 3 AND m_балл >= 3                      THEN 'Потенциально лояльные'
+            WHEN r_балл <= 2 AND f_балл >= 4                      THEN 'Группа риска'
+            WHEN r_балл <= 2 AND f_балл >= 2                      THEN 'Нельзя потерять'
+            WHEN r_балл <= 2 AND f_балл <= 2                      THEN 'Потерянные'
+            ELSE                                                       'Спящие'
+        END                                                        AS сегмент
+    FROM rfm_оценки
 )
 SELECT
-    segment,
-    COUNT(customer_id)                                            AS customer_count,
-    ROUND(AVG(recency_days), 1)                                   AS avg_recency_days,
-    ROUND(AVG(frequency), 2)                                      AS avg_frequency,
-    ROUND(AVG(monetary), 2)                                       AS avg_monetary,
-    ROUND(SUM(monetary), 2)                                       AS total_revenue,
-    ROUND(100.0 * COUNT(customer_id) / SUM(COUNT(customer_id)) OVER (), 2) AS pct_customers,
-    ROUND(100.0 * SUM(monetary) / SUM(SUM(monetary)) OVER (), 2)  AS pct_revenue
-FROM rfm_segments
-GROUP BY segment
-ORDER BY total_revenue DESC;
+    сегмент,
+    COUNT(customer_id)                                            AS клиентов,
+    ROUND(AVG(давность_дней), 1)                                  AS ср_давность_дней,
+    ROUND(AVG(частота), 2)                                        AS ср_частота,
+    ROUND(AVG(монетизация), 2)                                    AS ср_монетизация,
+    ROUND(SUM(монетизация), 2)                                    AS суммарная_выручка,
+    ROUND(100.0 * COUNT(customer_id) / SUM(COUNT(customer_id)) OVER (), 2) AS доля_клиентов_pct,
+    ROUND(100.0 * SUM(монетизация) / SUM(SUM(монетизация)) OVER (), 2)    AS доля_выручки_pct
+FROM rfm_сегменты
+GROUP BY сегмент
+ORDER BY суммарная_выручка DESC;
 
 
 -- ------------------------------------------------------------
--- 4. COHORT RETENTION MATRIX
+-- 4. МАТРИЦА КОГОРТНОГО УДЕРЖАНИЯ
 -- ------------------------------------------------------------
-WITH cohort_base AS (
+WITH когорты AS (
     SELECT
         customer_id,
-        DATE_TRUNC('month', MIN(order_date))::DATE      AS cohort_month
+        DATE_TRUNC('month', MIN(дата_заказа))::DATE      AS когорта_месяц
     FROM orders
-    WHERE order_status != 'cancelled'
+    WHERE статус = 'выполнен'
     GROUP BY customer_id
 ),
-customer_activity AS (
+активность AS (
     SELECT
         o.customer_id,
-        cb.cohort_month,
-        DATE_TRUNC('month', o.order_date)::DATE         AS activity_month,
-        EXTRACT(
-            MONTH FROM AGE(
-                DATE_TRUNC('month', o.order_date),
-                cb.cohort_month
-            )
-        )::INT                                          AS period_number
+        к.когорта_месяц,
+        DATE_TRUNC('month', o.дата_заказа)::DATE         AS месяц_активности,
+        EXTRACT(MONTH FROM AGE(
+            DATE_TRUNC('month', o.дата_заказа),
+            к.когорта_месяц
+        ))::INT                                          AS номер_периода
     FROM orders o
-    JOIN cohort_base cb ON o.customer_id = cb.customer_id
-    WHERE o.order_status != 'cancelled'
+    JOIN когорты к ON o.customer_id = к.customer_id
+    WHERE o.статус = 'выполнен'
 ),
-cohort_sizes AS (
-    SELECT
-        cohort_month,
-        COUNT(DISTINCT customer_id)                     AS cohort_size
-    FROM cohort_base
-    GROUP BY cohort_month
+размер_когорт AS (
+    SELECT когорта_месяц, COUNT(DISTINCT customer_id) AS размер
+    FROM когорты GROUP BY когорта_месяц
 ),
-retention_counts AS (
+удержание AS (
     SELECT
-        ca.cohort_month,
-        ca.period_number,
-        COUNT(DISTINCT ca.customer_id)                  AS retained_customers
-    FROM customer_activity ca
-    GROUP BY ca.cohort_month, ca.period_number
+        а.когорта_месяц,
+        а.номер_периода,
+        COUNT(DISTINCT а.customer_id)                    AS удержано_клиентов
+    FROM активность а
+    GROUP BY а.когорта_месяц, а.номер_периода
 )
 SELECT
-    rc.cohort_month,
-    cs.cohort_size,
-    rc.period_number,
-    rc.retained_customers,
-    ROUND(
-        100.0 * rc.retained_customers / cs.cohort_size,
-        2
-    )                                                   AS retention_rate_pct
-FROM retention_counts rc
-JOIN cohort_sizes cs ON rc.cohort_month = cs.cohort_month
-WHERE rc.period_number <= 6
-ORDER BY rc.cohort_month, rc.period_number;
+    у.когорта_месяц,
+    р.размер                                             AS размер_когорты,
+    у.номер_периода,
+    у.удержано_клиентов,
+    -- Коэффициент удержания в процентах
+    ROUND(100.0 * у.удержано_клиентов / р.размер, 2)    AS retention_pct
+FROM удержание у
+JOIN размер_когорт р ON у.когорта_месяц = р.когорта_месяц
+WHERE у.номер_периода <= 6
+ORDER BY у.когорта_месяц, у.номер_периода;
 
 
 -- ------------------------------------------------------------
--- 5. PRODUCT CATEGORY PERFORMANCE
+-- 5. ЭФФЕКТИВНОСТЬ КАТЕГОРИЙ ТОВАРОВ
 -- ------------------------------------------------------------
-WITH category_metrics AS (
+WITH метрики_категорий AS (
     SELECT
-        p.category,
-        COUNT(DISTINCT oi.order_id)                         AS total_orders,
-        COUNT(DISTINCT o.customer_id)                       AS unique_buyers,
-        SUM(oi.quantity)                                    AS units_sold,
-        ROUND(SUM(oi.quantity * oi.unit_price)::NUMERIC, 2) AS gross_revenue,
-        ROUND(AVG(oi.unit_price)::NUMERIC, 2)               AS avg_unit_price,
-        ROUND(AVG(oi.quantity * oi.unit_price)::NUMERIC, 2) AS avg_item_revenue
-    FROM order_items oi
-    JOIN orders o   ON oi.order_id   = o.order_id
-    JOIN products p ON oi.product_id = p.product_id
-    WHERE o.order_status != 'cancelled'
-    GROUP BY p.category
+        категория,
+        COUNT(DISTINCT order_id)                             AS кол_заказов,
+        COUNT(DISTINCT customer_id)                          AS уникальных_покупателей,
+        ROUND(SUM(сумма_заказа)::NUMERIC, 2)                 AS выручка,
+        ROUND(AVG(сумма_заказа)::NUMERIC, 2)                 AS средний_чек
+    FROM orders
+    WHERE статус = 'выполнен'
+    GROUP BY категория
 ),
-category_ranked AS (
+категории_ранж AS (
     SELECT
         *,
-        RANK() OVER (ORDER BY gross_revenue DESC)           AS revenue_rank,
-        ROUND(
-            100.0 * gross_revenue / SUM(gross_revenue) OVER (),
-            2
-        )                                                   AS revenue_contribution_pct,
-        SUM(gross_revenue) OVER (ORDER BY gross_revenue DESC
-            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-        )                                                   AS cumulative_revenue
-    FROM category_metrics
+        RANK() OVER (ORDER BY выручка DESC)                  AS ранг_по_выручке,
+        ROUND(100.0 * выручка / SUM(выручка) OVER (), 2)    AS доля_выручки_pct,
+        -- Накопленный итог для Парето-анализа
+        SUM(выручка) OVER (ORDER BY выручка DESC
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS накопл_выручка
+    FROM метрики_категорий
 )
 SELECT
-    revenue_rank,
-    category,
-    total_orders,
-    unique_buyers,
-    units_sold,
-    gross_revenue,
-    avg_unit_price,
-    revenue_contribution_pct,
-    ROUND(
-        100.0 * cumulative_revenue / SUM(gross_revenue) OVER (),
-        2
-    )                                                       AS cumulative_pct
-FROM category_ranked
-ORDER BY revenue_rank;
+    ранг_по_выручке,
+    категория,
+    кол_заказов,
+    уникальных_покупателей,
+    выручка,
+    средний_чек,
+    доля_выручки_pct,
+    -- Накопленный % для Парето (80/20 анализ)
+    ROUND(100.0 * накопл_выручка / SUM(выручка) OVER (), 2) AS накопл_доля_pct
+FROM категории_ранж
+ORDER BY ранг_по_выручке;
